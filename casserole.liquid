@@ -1,0 +1,275 @@
+{% assign collection = collections['pet-co'] %}
+
+<section class="x-petco x-petco--h" data-petco-h aria-label="{{ collection.title | default: 'Pet-Co Collection' }}">
+  <h2 class="x-petco__heading">{{ collection.title | default: 'Pet-Co Collection' }}</h2>
+
+  {% if collection and collection.products_count > 0 %}
+    <div class="xpet__viewport">
+      <div class="xpet__mask">
+        <div class="xpet__track" role="list" tabindex="0" aria-label="{{ collection.title | default: 'Collection' }} products">
+          {% for product in collection.products %}
+            {% assign default_var = product.selected_or_first_available_variant | default: product.variants.first %}
+            {% assign start_img = default_var.image | default: product.featured_image %}
+            {% assign color_opt = product.options_by_name['Color'] | default: product.options_by_name['Colour'] %}
+            {% assign color_index = color_opt.position | default: 0 %}
+            {% assign default_color = '' %}
+            {% if color_opt %}
+              {% if color_index == 1 %}
+                {% assign default_color = default_var.option1 %}
+              {% elsif color_index == 2 %}
+                {% assign default_color = default_var.option2 %}
+              {% elsif color_index == 3 %}
+                {% assign default_color = default_var.option3 %}
+              {% endif %}
+            {% endif %}
+
+            <article class="x-card xpet__card" role="listitem" data-product-card>
+              <a class="x-card__link" href="{{ product.url }}">
+                <div class="x-card__media" data-media>
+                  <img
+                    data-product-image
+                    src="{{ start_img | image_url: width: 900 }}"
+                    srcset="{{ start_img | image_url: width: 600 }} 600w, {{ start_img | image_url: width: 900 }} 900w, {{ start_img | image_url: width: 1200 }} 1200w"
+                    sizes="(max-width: 599px) 80vw, (max-width: 899px) 50vw, (max-width: 1199px) 33vw, 22vw"
+                    data-featured-src="{{ product.featured_image | image_url: width: 900 }}"
+                    data-featured-srcset="{{ product.featured_image | image_url: width: 600 }} 600w, {{ product.featured_image | image_url: width: 900 }} 900w, {{ product.featured_image | image_url: width: 1200 }} 1200w"
+                    alt="{{ product.title | escape }}{% if default_color != blank %} — {{ default_color | escape }}{% endif %}"
+                    {% if forloop.index0 < 4 %}loading="eager" fetchpriority="high"{% else %}loading="lazy"{% endif %}
+                  >
+                </div>
+                <div class="x-card__info">
+                  <h3 class="x-card__title">{{ product.title }}</h3>
+                  <p class="x-card__price">{{ product.price | money }}</p>
+                </div>
+              </a>
+
+              {% if color_opt and color_opt.values.size > 0 %}
+                <div class="x-swatches" role="radiogroup" aria-label="Choose color">
+                  {% for color_val in color_opt.values %}
+                    {% assign repr = blank %}
+                    {% if color_index == 1 %}
+                      {% assign repr = product.variants | where: 'option1', color_val | where: 'available', true | first %}
+                      {% if repr == blank %}{% assign repr = product.variants | where: 'option1', color_val | first %}{% endif %}
+                    {% elsif color_index == 2 %}
+                      {% assign repr = product.variants | where: 'option2', color_val | where: 'available', true | first %}
+                      {% if repr == blank %}{% assign repr = product.variants | where: 'option2', color_val | first %}{% endif %}
+                    {% elsif color_index == 3 %}
+                      {% assign repr = product.variants | where: 'option3', color_val | where: 'available', true | first %}
+                      {% if repr == blank %}{% assign repr = product.variants | where: 'option3', color_val | first %}{% endif %}
+                    {% endif %}
+
+                    {% assign img_obj = repr.image | default: product.featured_image %}
+                    {% assign swatch_hex = repr.metafields.custom.swatch_hex | default: '' %}
+                    {% assign css_name = color_val | downcase | replace: ' ', '' %}
+
+                    {%- comment -%} tiny fallback map for common names {%- endcomment -%}
+                    {% assign mapped_hex = '' %}
+                    {% case css_name %}
+                      {% when 'rosegold' %}{% assign mapped_hex = '#b76e79' %}
+                      {% when 'navy' %}{% assign mapped_hex = '#001f3f' %}
+                      {% when 'beige' %}{% assign mapped_hex = '#d9c9a6' %}
+                      {% when 'cream' %}{% assign mapped_hex = '#f5f1e6' %}
+                    {% endcase %}
+                    {% assign fill = swatch_hex | default: mapped_hex | default: css_name %}
+
+                    <button
+                      type="button"
+                      class="x-swatch"
+                      role="radio"
+                      aria-label="{{ color_val }}"
+                      aria-checked="{% if color_val == default_color %}true{% else %}false{% endif %}"
+                      {% if color_val == default_color %}tabindex="0"{% else %}tabindex="-1"{% endif %}
+                      title="{{ color_val }}"
+                      {% if repr and repr.available == false %}aria-disabled="true" disabled{% endif %}
+                      data-variant-id="{{ repr.id }}"
+                      data-variant-url="{{ repr.url }}"
+                      data-image-src="{{ img_obj | image_url: width: 900 }}"
+                      data-image-srcset="{{ img_obj | image_url: width: 600 }} 600w, {{ img_obj | image_url: width: 900 }} 900w, {{ img_obj | image_url: width: 1200 }} 1200w"
+                      data-color-name="{{ color_val | escape }}"
+                      style="--swatch-bg: {{ fill }};"
+                    >
+                      <span class="x-swatch__box" aria-hidden="true"></span>
+                    </button>
+                  {% endfor %}
+                </div>
+              {% endif %}
+            </article>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  {% else %}
+    <p>No products found.</p>
+  {% endif %}
+</section>
+
+<style>
+  /* ===== Base wrapper / heading ===== */
+  .x-petco{
+    width:100%;
+    padding:32px 50px; /* ← fixed side padding: 50px */
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif
+  }
+  .x-petco__heading{margin:0 0 20px;font-weight:600;font-size:1.6rem}
+
+  /* ===== Horizontal layout (no fades) ===== */
+  .xpet__viewport{position:relative}
+  .xpet__mask{
+    overflow:hidden; /* keep to avoid any micro-scrollbar bleed; no masks applied */
+  }
+
+  .xpet__track{
+    display:flex;
+    gap:16px;
+    padding-block:4px;
+    overflow-x:auto;
+    overscroll-behavior-x:contain;
+    scroll-snap-type:x mandatory;
+    scroll-behavior:smooth;
+    outline:none;
+  }
+  .xpet__track:focus-visible{outline:2px solid #000;outline-offset:4px}
+
+  /* Hide scrollbars visually only (still scrollable) */
+  .xpet__track{scrollbar-width:none;-ms-overflow-style:none}
+  .xpet__track::-webkit-scrollbar{display:none}
+
+  /* Cards snap and size for ~4 per view on desktop */
+  .xpet__card{flex:0 0 calc((100% - 3*16px)/4);scroll-snap-align:start}
+
+  /* Responsive “cards per view” */
+  @media (max-width:1199px){.xpet__card{flex-basis:calc((100% - 2*16px)/3)}}
+  @media (max-width:899px){.xpet__card{flex-basis:calc((100% - 1*16px)/2)}}
+  @media (max-width:599px){.xpet__card{flex-basis:80%}}
+
+  /* ===== Card visuals (unchanged) ===== */
+  .x-card{border:none;border-radius:0;overflow:hidden;background:#fff}
+  .x-card__media img{width:100%;aspect-ratio:1/1;object-fit:cover;display:block}
+  .x-card__info{padding:12px 0}
+  .x-card__title{font-size:15px;line-height:1.25;margin:6px 0}
+  .x-card__price{font-size:14px;margin:0 0 8px}
+
+  /* Swatches */
+  .x-swatches{display:flex;gap:8px;flex-wrap:wrap;padding:0 0 12px}
+  .x-swatch{--size:22px;width:var(--size);height:var(--size);border:none;border-radius:0;background:#fff;padding:0;box-sizing:border-box;display:inline-grid;place-items:center;cursor:pointer;transition:border-color .15s, box-shadow .15s}
+  .x-swatch[aria-checked="true"]{border:2px solid #000}
+  .x-swatch:focus-visible{outline:2px solid #000;outline-offset:2px}
+  .x-swatch[disabled]{opacity:.5;cursor:not-allowed}
+  .x-swatch__box{width:100%;height:100%;border-radius:0;background:var(--swatch-bg, #e5e5e5);box-shadow:inset 0 0 0 1px rgba(0,0,0,.06)}
+
+  /* Reduced motion */
+  @media (prefers-reduced-motion: reduce){.xpet__track{scroll-behavior:auto}}
+</style>
+
+<script>
+(function(){
+  var root=document.querySelector('[data-petco-h]');
+  if(!root)return;
+
+  function setImage(imgEl,src,srcset){
+    if(!imgEl||!src)return;
+    imgEl.src=src;if(srcset)imgEl.srcset=srcset;
+    if(imgEl.hasAttribute('data-src'))imgEl.setAttribute('data-src',src);
+    if(imgEl.hasAttribute('data-srcset')&&srcset)imgEl.setAttribute('data-srcset',srcset);
+    var pic=imgEl.closest('picture');
+    if(pic){
+      pic.querySelectorAll('source[srcset]').forEach(s=>s.setAttribute('srcset',srcset||src));
+      pic.querySelectorAll('source[data-srcset]').forEach(s=>s.setAttribute('data-srcset',srcset||src));
+    }
+  }
+  function updateAltWithColor(imgEl, color){
+    var base=(imgEl.getAttribute('alt')||'').split(' — ')[0];
+    imgEl.setAttribute('alt', color ? (base+' — '+color) : base);
+  }
+  function preload(url){if(!url)return;var i=new Image();i.decoding='async';i.loading='eager';i.src=url;}
+  function isInner(container, next){return !!(next && container && container.contains(next));}
+
+  // init per card
+  root.querySelectorAll('[data-product-card]').forEach(function(card){
+    var imgEl=card.querySelector('[data-product-image]');if(!imgEl)return;
+    var start = imgEl.currentSrc || imgEl.src || imgEl.getAttribute('data-featured-src') || '';
+    card.dataset.selectedSrc = start;
+    card.dataset.selectedSrcset = imgEl.getAttribute('srcset') || imgEl.getAttribute('data-featured-srcset') || '';
+  });
+
+  var canHover=window.matchMedia&&window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+  if(canHover){
+    root.addEventListener('mouseover',function(e){
+      var media=e.target.closest('[data-media]');if(!media)return;
+      if(isInner(media, e.relatedTarget)) return;
+      var imgEl=media.querySelector('[data-product-image]');if(!imgEl)return;
+      var fsrc=imgEl.getAttribute('data-featured-src');var fset=imgEl.getAttribute('data-featured-srcset');if(!fsrc)return;
+      preload(fsrc);setImage(imgEl,fsrc,fset);
+    },true);
+
+    root.addEventListener('mouseout',function(e){
+      var media=e.target.closest('[data-media]');if(!media)return;
+      if(isInner(media, e.relatedTarget)) return;
+      var card=media.closest('[data-product-card]');var imgEl=media.querySelector('[data-product-image]');
+      if(!card||!imgEl)return;
+      setImage(imgEl,card.dataset.selectedSrc,card.dataset.selectedSrcset);
+    },true);
+
+    root.addEventListener('focusin',function(e){
+      var media=e.target.closest('[data-media]');if(!media)return;
+      var imgEl=media.querySelector('[data-product-image]');if(!imgEl)return;
+      var fsrc=imgEl.getAttribute('data-featured-src');var fset=imgEl.getAttribute('data-featured-srcset');if(!fsrc)return;
+      preload(fsrc);setImage(imgEl,fsrc,fset);
+    });
+    root.addEventListener('focusout',function(e){
+      var media=e.target.closest('[data-media]');if(!media)return;
+      var card=media.closest('[data-product-card]');var imgEl=media.querySelector('[data-product-image]');
+      if(!card||!imgEl)return;
+      setImage(imgEl,card.dataset.selectedSrc,card.dataset.selectedSrcset);
+    });
+  }
+
+  // Swatch selection (roving tabindex + immediate image + alt)
+  root.addEventListener('click',function(e){
+    var sw=e.target.closest('.x-swatch');if(!sw||sw.disabled)return;
+    var card=sw.closest('[data-product-card]');if(!card)return;
+    var group=sw.closest('[role="radiogroup"]');
+    if(group){
+      group.querySelectorAll('.x-swatch[aria-checked="true"]').forEach(function(el){el.setAttribute('aria-checked','false');});
+      group.querySelectorAll('.x-swatch').forEach(function(el){el.tabIndex=-1;});
+      sw.setAttribute('aria-checked','true'); sw.tabIndex=0;
+    }
+    var newSrc=sw.getAttribute('data-image-src');var newSet=sw.getAttribute('data-image-srcset');
+    card.dataset.selectedSrc=newSrc||'';card.dataset.selectedSrcset=newSet||'';
+    var imgEl=card.querySelector('[data-product-image]');
+    setImage(imgEl,newSrc,newSet);
+    updateAltWithColor(imgEl, sw.getAttribute('data-color-name')||'');
+    sw.focus();
+  });
+
+  // Keyboard: track horizontal scroll + swatch roving
+  var track=root.querySelector('.xpet__track');
+  root.addEventListener('keydown',function(e){
+    if(e.target === track){
+      const first = track.querySelector('.xpet__card');
+      const rect = first ? first.getBoundingClientRect() : {width: track.clientWidth};
+      const gap = parseFloat(getComputedStyle(track).columnGap || getComputedStyle(track).gap) || 0;
+      const step = Math.round(rect.width + gap);
+      if(e.key==='ArrowRight'){ e.preventDefault(); track.scrollBy({left:step, behavior:'smooth'}); }
+      else if(e.key==='ArrowLeft'){ e.preventDefault(); track.scrollBy({left:-step, behavior:'smooth'}); }
+      else if(e.key==='PageDown'){ e.preventDefault(); track.scrollBy({left:track.clientWidth, behavior:'smooth'}); }
+      else if(e.key==='PageUp'){ e.preventDefault(); track.scrollBy({left:-track.clientWidth, behavior:'smooth'}); }
+      else if(e.key==='Home'){ e.preventDefault(); track.scrollTo({left:0, behavior:'smooth'}); }
+      else if(e.key==='End'){ e.preventDefault(); track.scrollTo({left:track.scrollWidth, behavior:'smooth'}); }
+    }
+
+    var current=e.target.closest('.x-swatch'); if(!current) return;
+    var group=current.closest('[role="radiogroup"]'); if(!group) return;
+    var radios=Array.from(group.querySelectorAll('.x-swatch:not([disabled])'));
+    var i=radios.indexOf(current); if(i<0) return;
+    var nextIndex=i;
+    if(e.key==='ArrowRight'||e.key==='ArrowDown'){ nextIndex=(i+1)%radios.length; }
+    else if(e.key==='ArrowLeft'||e.key==='ArrowUp'){ nextIndex=(i-1+radios.length)%radios.length; }
+    else if(e.key==='Home'){ nextIndex=0; }
+    else if(e.key==='End'){ nextIndex=radios.length-1; }
+    else { return; }
+    e.preventDefault();
+    radios[nextIndex].click();
+  });
+})();
+</script>
