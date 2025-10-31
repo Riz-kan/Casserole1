@@ -5,6 +5,11 @@
 
   {% if collection and collection.products_count > 0 %}
     <div class="xpet__viewport">
+      <button class="xpet__nav-button xpet__nav-button--prev" type="button" aria-label="Scroll left">
+        <svg viewBox="0 0 16 16" aria-hidden="true">
+          <path d="M10.53 3.47a.75.75 0 0 0-1.06 0L5.94 6.99a1.25 1.25 0 0 0 0 2.02l3.53 3.52a.75.75 0 1 0 1.06-1.06L7 8l3.53-3.47a.75.75 0 0 0 0-1.06Z"></path>
+        </svg>
+      </button>
       <div class="xpet__mask">
         <div class="xpet__track" role="list" tabindex="0" aria-label="{{ collection.title | default: 'Collection' }} products">
           {% for product in collection.products %}
@@ -97,6 +102,11 @@
           {% endfor %}
         </div>
       </div>
+      <button class="xpet__nav-button xpet__nav-button--next" type="button" aria-label="Scroll right">
+        <svg viewBox="0 0 16 16" aria-hidden="true">
+          <path d="M5.47 12.53a.75.75 0 0 0 1.06 0L10.06 9a1.25 1.25 0 0 0 0-2.02L6.53 3.47a.75.75 0 1 0-1.06 1.06L9 8l-3.53 3.47a.75.75 0 0 0 0 1.06Z"></path>
+        </svg>
+      </button>
     </div>
   {% else %}
     <p>No products found.</p>
@@ -114,6 +124,39 @@
 
   /* ===== Horizontal layout (no fades) ===== */
   .xpet__viewport{position:relative}
+  .xpet__nav-button{
+    position:absolute;
+    top:50%;
+    transform:translateY(-50%);
+    width:40px;
+    height:40px;
+    margin:0;
+    padding:0;
+    display:grid;
+    place-items:center;
+    border:none;
+    border-radius:50%;
+    background:rgba(255,255,255,0.95);
+    color:#000;
+    box-shadow:0 4px 12px rgba(0,0,0,0.12);
+    cursor:pointer;
+    opacity:0;
+    visibility:hidden;
+    pointer-events:none;
+    transition:opacity .2s ease, visibility .2s ease, background-color .2s ease;
+  }
+  .xpet__nav-button svg{width:18px;height:18px;display:block;fill:currentColor}
+  .xpet__nav-button--prev{left:8px}
+  .xpet__nav-button--next{right:8px}
+  .xpet__viewport[data-can-scroll="true"]:hover .xpet__nav-button,
+  .xpet__viewport[data-can-scroll="true"]:focus-within .xpet__nav-button,
+  .xpet__viewport[data-can-scroll="true"] .xpet__nav-button:focus-visible{
+    opacity:1;
+    visibility:visible;
+    pointer-events:auto;
+  }
+  .xpet__nav-button:focus-visible{outline:2px solid #000;outline-offset:2px}
+  .xpet__nav-button[disabled]{opacity:0;visibility:hidden;pointer-events:none}
   .xpet__mask{
     overflow:hidden; /* keep to avoid any micro-scrollbar bleed; no masks applied */
   }
@@ -244,12 +287,61 @@
 
   // Keyboard: track horizontal scroll + swatch roving
   var track=root.querySelector('.xpet__track');
+  var viewport=root.querySelector('.xpet__viewport');
+  var prevButton=root.querySelector('.xpet__nav-button--prev');
+  var nextButton=root.querySelector('.xpet__nav-button--next');
+
+  function getStep(){
+    if(!track)return 0;
+    var first=track.querySelector('.xpet__card');
+    var cardWidth=first ? first.getBoundingClientRect().width : track.clientWidth;
+    var styles=getComputedStyle(track);
+    var gap=parseFloat(styles.columnGap||styles.gap||0)||0;
+    var step=Math.round(cardWidth+gap);
+    return step>0 ? step : track.clientWidth;
+  }
+
+  function updateNavButtons(){
+    if(!track||!viewport)return;
+    var maxScroll=Math.max(track.scrollWidth-track.clientWidth,0);
+    var canScroll=maxScroll>1;
+    if(canScroll){
+      viewport.dataset.canScroll='true';
+    }else{
+      delete viewport.dataset.canScroll;
+    }
+    if(prevButton){
+      prevButton.disabled=!canScroll||track.scrollLeft<=1;
+    }
+    if(nextButton){
+      nextButton.disabled=!canScroll||track.scrollLeft>=maxScroll-1;
+    }
+  }
+
+  if(prevButton){
+    prevButton.addEventListener('click',function(){
+      if(!track)return;
+      var step=getStep();
+      track.scrollBy({left:-step,behavior:'smooth'});
+    });
+  }
+  if(nextButton){
+    nextButton.addEventListener('click',function(){
+      if(!track)return;
+      var step=getStep();
+      track.scrollBy({left:step,behavior:'smooth'});
+    });
+  }
+  if(track){
+    track.addEventListener('scroll',updateNavButtons,{passive:true});
+  }
+  window.addEventListener('resize',updateNavButtons);
+  window.addEventListener('load',updateNavButtons);
+  updateNavButtons();
+
   root.addEventListener('keydown',function(e){
     if(e.target === track){
-      const first = track.querySelector('.xpet__card');
-      const rect = first ? first.getBoundingClientRect() : {width: track.clientWidth};
-      const gap = parseFloat(getComputedStyle(track).columnGap || getComputedStyle(track).gap) || 0;
-      const step = Math.round(rect.width + gap);
+      const step = getStep();
       if(e.key==='ArrowRight'){ e.preventDefault(); track.scrollBy({left:step, behavior:'smooth'}); }
       else if(e.key==='ArrowLeft'){ e.preventDefault(); track.scrollBy({left:-step, behavior:'smooth'}); }
       else if(e.key==='PageDown'){ e.preventDefault(); track.scrollBy({left:track.clientWidth, behavior:'smooth'}); }
