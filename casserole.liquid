@@ -5,7 +5,7 @@
 
   {% if collection and collection.products_count > 0 %}
     <div class="xpet__viewport">
-      <button class="xpet__nav-button xpet__nav-button--prev" type="button" aria-label="Scroll left">
+      <button class="xpet__nav-button xpet__nav-button--prev" type="button" aria-label="Scroll left" aria-hidden="true">
         <svg viewBox="0 0 16 16" aria-hidden="true">
           <path d="M10.53 3.47a.75.75 0 0 0-1.06 0L5.94 6.99a1.25 1.25 0 0 0 0 2.02l3.53 3.52a.75.75 0 1 0 1.06-1.06L7 8l3.53-3.47a.75.75 0 0 0 0-1.06Z"></path>
         </svg>
@@ -102,7 +102,7 @@
           {% endfor %}
         </div>
       </div>
-      <button class="xpet__nav-button xpet__nav-button--next" type="button" aria-label="Scroll right">
+      <button class="xpet__nav-button xpet__nav-button--next" type="button" aria-label="Scroll right" aria-hidden="true">
         <svg viewBox="0 0 16 16" aria-hidden="true">
           <path d="M5.47 12.53a.75.75 0 0 0 1.06 0L10.06 9a1.25 1.25 0 0 0 0-2.02L6.53 3.47a.75.75 0 1 0-1.06 1.06L9 8l-3.53 3.47a.75.75 0 0 0 0 1.06Z"></path>
         </svg>
@@ -132,10 +132,11 @@
     height:40px;
     margin:0;
     padding:0;
-    display:grid;
-    place-items:center;
+    display:flex;
+    align-items:center;
+    justify-content:center;
     border:none;
-    border-radius:50%;
+    border-radius:8px;
     background:rgba(255,255,255,0.95);
     color:#000;
     box-shadow:0 4px 12px rgba(0,0,0,0.12);
@@ -143,13 +144,14 @@
     opacity:0;
     visibility:hidden;
     pointer-events:none;
-    transition:opacity .2s ease, visibility .2s ease, background-color .2s ease;
+    transition:opacity .2s ease, visibility .2s ease, background-color .2s ease, box-shadow .2s ease;
+    z-index:1;
   }
   .xpet__nav-button svg{width:18px;height:18px;display:block;fill:currentColor}
   .xpet__nav-button--prev{left:8px}
   .xpet__nav-button--next{right:8px}
-  .xpet__viewport[data-can-scroll="true"]:hover .xpet__nav-button,
-  .xpet__viewport[data-can-scroll="true"]:focus-within .xpet__nav-button,
+  .xpet__viewport[data-can-scroll="true"]:hover .xpet__nav-button:not([disabled]),
+  .xpet__viewport[data-can-scroll="true"]:focus-within .xpet__nav-button:not([disabled]),
   .xpet__viewport[data-can-scroll="true"] .xpet__nav-button:focus-visible{
     opacity:1;
     visibility:visible;
@@ -301,6 +303,16 @@
     return step>0 ? step : track.clientWidth;
   }
 
+  function setNavAvailability(button, available){
+    if(!button) return;
+    button.disabled=!available;
+    if(available){
+      button.removeAttribute('aria-hidden');
+    }else{
+      button.setAttribute('aria-hidden','true');
+    }
+  }
+
   function updateNavButtons(){
     if(!track||!viewport)return;
     var maxScroll=Math.max(track.scrollWidth-track.clientWidth,0);
@@ -310,12 +322,10 @@
     }else{
       delete viewport.dataset.canScroll;
     }
-    if(prevButton){
-      prevButton.disabled=!canScroll||track.scrollLeft<=1;
-    }
-    if(nextButton){
-      nextButton.disabled=!canScroll||track.scrollLeft>=maxScroll-1;
-    }
+    var atStart=track.scrollLeft<=1;
+    var atEnd=track.scrollLeft>=maxScroll-1;
+    setNavAvailability(prevButton, canScroll && !atStart);
+    setNavAvailability(nextButton, canScroll && !atEnd);
   }
 
   if(prevButton){
