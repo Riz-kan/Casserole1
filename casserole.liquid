@@ -194,6 +194,17 @@
 
   var canHover=window.matchMedia&&window.matchMedia('(hover: hover) and (pointer: fine)').matches;
   if(canHover){
+    root.addEventListener('pointerenter',function(event){
+      var sw=event.target.closest('.x-swatch');
+      if(!sw||sw.disabled)return;
+      if(sw.dataset.preloaded==='1')return;
+      var previewSrc=sw.getAttribute('data-image-src');
+      if(previewSrc){
+        preload(previewSrc);
+        sw.dataset.preloaded='1';
+      }
+    },true);
+
     root.addEventListener('mouseover',function(e){
       var media=e.target.closest('[data-media]');if(!media)return;
       if(isInner(media, e.relatedTarget)) return;
