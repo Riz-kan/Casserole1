@@ -102,18 +102,9 @@
                     {% endif %}
 
                     {% assign img_obj = repr.image | default: product.featured_image %}
-                    {% assign swatch_hex = repr.metafields.custom.swatch_hex | default: '' %}
-                    {% assign css_name = color_val | downcase | replace: ' ', '' %}
-
-                    {%- comment -%} tiny fallback map for common names {%- endcomment -%}
-                    {% assign mapped_hex = '' %}
-                    {% case css_name %}
-                      {% when 'rosegold' %}{% assign mapped_hex = '#b76e79' %}
-                      {% when 'navy' %}{% assign mapped_hex = '#001f3f' %}
-                      {% when 'beige' %}{% assign mapped_hex = '#d9c9a6' %}
-                      {% when 'cream' %}{% assign mapped_hex = '#f5f1e6' %}
-                    {% endcase %}
-                    {% assign fill = swatch_hex | default: mapped_hex | default: css_name %}
+                    {% assign color_meta = repr.metafields.custom.color_ref.value %}
+                    {% assign color_hex = color_meta.color_hex | default: '' %}
+                    {% assign fill = color_hex | default: '#e5e5e5' %}
 
                     <button
                       type="button"
