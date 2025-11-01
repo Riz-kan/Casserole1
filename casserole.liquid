@@ -29,24 +29,61 @@
             {% endif %}
 
             <article class="x-card xpet__card" role="listitem" data-product-card>
-              <a class="x-card__link" href="{{ product.url }}">
-                <div class="x-card__media" data-media>
-                  <img
-                    data-product-image
-                    src="{{ start_img | image_url: width: 900 }}"
-                    srcset="{{ start_img | image_url: width: 600 }} 600w, {{ start_img | image_url: width: 900 }} 900w, {{ start_img | image_url: width: 1200 }} 1200w"
-                    sizes="(max-width: 599px) 80vw, (max-width: 899px) 50vw, (max-width: 1199px) 33vw, 22vw"
-                    data-featured-src="{{ product.featured_image | image_url: width: 900 }}"
-                    data-featured-srcset="{{ product.featured_image | image_url: width: 600 }} 600w, {{ product.featured_image | image_url: width: 900 }} 900w, {{ product.featured_image | image_url: width: 1200 }} 1200w"
-                    alt="{{ product.title | escape }}{% if default_color != blank %} — {{ default_color | escape }}{% endif %}"
-                    {% if forloop.index0 < 4 %}loading="eager" fetchpriority="high"{% else %}loading="lazy"{% endif %}
+              <div class="x-card__media" data-media tabindex="-1">
+                <img
+                  data-product-image
+                  src="{{ start_img | image_url: width: 900 }}"
+                  srcset="{{ start_img | image_url: width: 600 }} 600w, {{ start_img | image_url: width: 900 }} 900w, {{ start_img | image_url: width: 1200 }} 1200w"
+                  sizes="(max-width: 599px) 80vw, (max-width: 899px) 50vw, (max-width: 1199px) 33vw, 22vw"
+                  data-featured-src="{{ product.featured_image | image_url: width: 900 }}"
+                  data-featured-srcset="{{ product.featured_image | image_url: width: 600 }} 600w, {{ product.featured_image | image_url: width: 900 }} 900w, {{ product.featured_image | image_url: width: 1200 }} 1200w"
+                  alt="{{ product.title | escape }}{% if default_color != blank %} — {{ default_color | escape }}{% endif %}"
+                  {% if forloop.index0 < 4 %}loading="eager" fetchpriority="high"{% else %}loading="lazy"{% endif %}
+                >
+
+                <div class="x-card__actions">
+                  <product-form-component
+                    data-section-id="{{ section.id }}"
+                    data-product-id="{{ product.id }}"
+                    data-quantity-default="1"
+                    on:submit="/handleSubmit"
                   >
+                    <div class="visually-hidden" ref="liveRegion" aria-live="off"></div>
+
+                    <form method="post" action="/cart/add" data-type="add-to-cart-form">
+                      <input type="hidden" name="id" value="{{ default_var.id }}" ref="variantId">
+                      <input type="hidden" name="quantity" value="1">
+
+                      <span class="product-form-text__error hidden" ref="addToCartTextError">
+                        <span class="svg-wrapper product-form-icon--error">
+                          {{- 'icon-error.svg' | inline_asset_content -}}
+                        </span>
+                      </span>
+
+                      <add-to-cart-component
+                        ref="addToCartButtonContainer"
+                        data-add-to-cart-animation="true"
+                        data-product-variant-media="{{ start_img | image_url: width: 600 }}"
+                        on:click="/handleClick"
+                      >
+                        <button type="submit" class="button" ref="addToCartButton" name="add" {% unless default_var.available %}disabled{% endunless %}>
+                          <span class="add-to-cart-text--default">{{ 'products.product.add_to_cart' | t }}</span>
+                          <span class="add-to-cart-text--added" aria-hidden="true">{{ 'products.product.added' | t }}</span>
+                        </button>
+                      </add-to-cart-component>
+
+                      <div ref="acceleratedCheckoutButtonContainer" hidden></div>
+                    </form>
+                  </product-form-component>
                 </div>
-                <div class="x-card__info">
-                  <h3 class="x-card__title">{{ product.title }}</h3>
-                  <p class="x-card__price">{{ product.price | money }}</p>
-                </div>
-              </a>
+              </div>
+
+              <div class="x-card__info">
+                <h3 class="x-card__title">
+                  <a class="x-card__title-link" href="{{ product.url }}">{{ product.title }}</a>
+                </h3>
+                <p class="x-card__price">{{ product.price | money }}</p>
+              </div>
 
               {% if color_opt and color_opt.values.size > 0 %}
                 <div class="x-swatches" role="radiogroup" aria-label="Choose color">
@@ -188,10 +225,32 @@
 
   /* ===== Card visuals (unchanged) ===== */
   .x-card{border:none;border-radius:0;overflow:hidden;background:#fff}
+  .x-card__media{position:relative}
   .x-card__media img{width:100%;aspect-ratio:1/1;object-fit:cover;display:block}
   .x-card__info{padding:12px 0}
   .x-card__title{font-size:15px;line-height:1.25;margin:6px 0}
+  .x-card__title-link{color:inherit;text-decoration:none}
+  .x-card__title-link:hover{text-decoration:underline}
+  .x-card__title-link:focus-visible{outline:2px solid #000;outline-offset:2px}
   .x-card__price{font-size:14px;margin:0 0 8px}
+
+  .visually-hidden{position:absolute!important;clip:rect(1px,1px,1px,1px);clip-path:inset(50%);height:1px;width:1px;overflow:hidden;white-space:nowrap;border:0;padding:0;margin:-1px}
+
+  .product-form-text__error,
+  [ref="addToCartTextError"]{display:none!important;}
+  .add-to-cart-text--default{display:inline!important;}
+  .add-to-cart-text--added{display:none!important;}
+
+  .x-card__actions{position:absolute;left:12px;right:12px;bottom:12px;z-index:2;pointer-events:none}
+  .x-card__actions product-form-component,
+  .x-card__actions form,
+  .x-card__actions add-to-cart-component{pointer-events:auto}
+  .x-card__actions .button{width:100%}
+  .x-card__actions{opacity:0;transform:translateY(8px);transition:opacity .18s ease, transform .18s ease}
+  .x-card__media:hover .x-card__actions,
+  .x-card__media:focus-within .x-card__actions{opacity:1;transform:none}
+  @media (hover:none){ .x-card__media .x-card__actions{opacity:1;transform:none} }
+  @media (prefers-reduced-motion: reduce){ .x-card__actions{transition:none} }
 
   /* Swatches */
   .x-swatches{display:flex;gap:8px;flex-wrap:wrap;padding:0 0 12px}
@@ -283,6 +342,13 @@
     var imgEl=card.querySelector('[data-product-image]');
     setImage(imgEl,newSrc,newSet);
     updateAltWithColor(imgEl, sw.getAttribute('data-color-name')||'');
+    var formComp=card.querySelector('product-form-component');
+    var variantInput=formComp&&formComp.querySelector('input[name="id"][ref="variantId"]');
+    if(variantInput){ variantInput.value=sw.getAttribute('data-variant-id')||''; }
+    var atcComp=formComp&&formComp.querySelector('add-to-cart-component');
+    if(atcComp&&newSrc){ atcComp.setAttribute('data-product-variant-media',newSrc); }
+    var btn=formComp&&formComp.querySelector('[ref="addToCartButton"]');
+    if(btn){ btn.disabled=sw.hasAttribute('aria-disabled'); }
     sw.focus();
   });
 
@@ -372,5 +438,15 @@
     e.preventDefault();
     radios[nextIndex].click();
   });
+
+  root.addEventListener('submit', function(e){
+    var f=e.target.closest('form[data-type="add-to-cart-form"]'); if(!f) return;
+    var id=(f.querySelector('input[name="id"][ref="variantId"]')||{}).value||'';
+    var btn=f.querySelector('[ref="addToCartButton"]');
+    if(!id || (btn && btn.disabled)){
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  }, true);
 })();
 </script>
