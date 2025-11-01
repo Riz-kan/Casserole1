@@ -329,6 +329,23 @@
 
   // Swatch selection (roving tabindex + immediate image + alt)
   root.addEventListener('click',function(e){
+    var addBtn=e.target.closest('[data-product-card] [ref="addToCartButton"]');
+    if(addBtn && !addBtn.disabled){
+      var card=addBtn.closest('[data-product-card]');
+      var media=card&&card.querySelector('[data-media]');
+      var titleLink=card&&card.querySelector('.x-card__title-link');
+      var blurFn=function(){
+        addBtn.blur();
+        if(media&&typeof media.blur==='function'){media.blur();}
+        if(titleLink&&typeof titleLink.focus==='function'){titleLink.focus();}
+      };
+      if(window.requestAnimationFrame){
+        window.requestAnimationFrame(function(){window.requestAnimationFrame(blurFn);});
+      }else{
+        setTimeout(blurFn,0);
+      }
+    }
+
     var sw=e.target.closest('.x-swatch');if(!sw||sw.disabled)return;
     var card=sw.closest('[data-product-card]');if(!card)return;
     var group=sw.closest('[role="radiogroup"]');
