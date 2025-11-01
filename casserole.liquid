@@ -66,9 +66,10 @@
                         data-product-variant-media="{{ start_img | image_url: width: 600 }}"
                         on:click="/handleClick"
                       >
-                        <button type="submit" class="button" ref="addToCartButton" name="add" {% unless default_var.available %}disabled{% endunless %}>
-                          <span class="add-to-cart-text--default">{{ 'products.product.add_to_cart' | t }}</span>
-                          <span class="add-to-cart-text--added" aria-hidden="true">{{ 'products.product.added' | t }}</span>
+                        <button type="submit" class="button x-card__add-button" ref="addToCartButton" name="add" {% unless default_var.available %}disabled{% endunless %}>
+                          <span class="x-card__add-icon" aria-hidden="true">+</span>
+                          <span class="visually-hidden add-to-cart-text--default">{{ 'products.product.add_to_cart' | t }}</span>
+                          <span class="visually-hidden add-to-cart-text--added" aria-hidden="true">{{ 'products.product.added' | t }}</span>
                         </button>
                       </add-to-cart-component>
 
@@ -241,11 +242,16 @@
   .add-to-cart-text--default{display:inline!important;}
   .add-to-cart-text--added{display:none!important;}
 
-  .x-card__actions{position:absolute;left:12px;right:12px;bottom:12px;z-index:2;pointer-events:none}
+  .x-card__actions{position:absolute;right:12px;bottom:12px;z-index:2;pointer-events:none;display:flex;justify-content:flex-end}
   .x-card__actions product-form-component,
   .x-card__actions form,
-  .x-card__actions add-to-cart-component{pointer-events:auto}
-  .x-card__actions .button{width:100%}
+  .x-card__actions add-to-cart-component{pointer-events:auto;display:block}
+  .x-card__add-button{width:48px;height:48px;border-radius:8px;border:1px solid rgba(0,0,0,.08);background:#fff;padding:0;display:grid;place-items:center;font-size:0;line-height:0;transition:background-color .18s ease, box-shadow .18s ease, border-color .18s ease}
+  .x-card__add-button:focus-visible{outline:2px solid #000;outline-offset:2px}
+  .x-card__add-button:hover,
+  .x-card__add-button:focus-visible{background:#f7f7f7;border-color:rgba(0,0,0,.12);box-shadow:0 4px 12px rgba(0,0,0,.16)}
+  .x-card__add-button:disabled{opacity:.4;cursor:not-allowed;box-shadow:none}
+  .x-card__add-icon{font-size:28px;line-height:1;color:#000}
   .x-card__actions{opacity:0;transform:translateY(8px);transition:opacity .18s ease, transform .18s ease}
   .x-card__media:hover .x-card__actions,
   .x-card__media:focus-within .x-card__actions{opacity:1;transform:none}
