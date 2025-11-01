@@ -113,7 +113,8 @@
                       {% when 'beige' %}{% assign mapped_hex = '#d9c9a6' %}
                       {% when 'cream' %}{% assign mapped_hex = '#f5f1e6' %}
                     {% endcase %}
-                    {% assign fill = swatch_hex | default: mapped_hex | default: css_name %}
+                    {% assign color_hex_from_ref = repr.metafields.custom.color_ref.color | default: repr.metafields.custom.color_ref.fields.color | default: '' %}
+                    {% assign fill = color_hex_from_ref | default: swatch_hex | default: mapped_hex | default: css_name %}
 
                     <button
                       type="button"
