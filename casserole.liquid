@@ -516,43 +516,60 @@
     });
   }
 
-  root.addEventListener('click',function(e){
-    var addBtn=e.target.closest('[data-product-card] [ref="addToCartButton"]');
-    if(addBtn){
-      if(addBtn.dataset.quickViewDisabled==='true' || addBtn.hasAttribute('disabled')){
-        e.preventDefault();
-        return;
+  function handleAddButtonClick(addBtn,event){
+    if(!addBtn)return;
+    if(addBtn.dataset.quickViewDisabled==='true' || addBtn.hasAttribute('disabled')){
+      if(event){
+        event.preventDefault();
+        if(typeof event.stopPropagation==='function'){event.stopPropagation();}
+        if(typeof event.stopImmediatePropagation==='function'){event.stopImmediatePropagation();}
       }
+      return;
+    }
+    var e=event||window.event;
+    if(e){
       e.preventDefault();
-      var card=addBtn.closest('[data-product-card]');
-      var product=null;
-      if(card){
-        product=productDataMap.get(card);
-        if(!product){
-          product=parseJSONScript(card.querySelector('script[data-product-json]'));
-          if(product){
-            productDataMap.set(card,product);
-          }
-        }
-      }
-      var variant=card?getSelectedVariant(card):null;
-      window.dispatchEvent(new CustomEvent('quick-view:open',{detail:{product:product,variant:variant,trigger:addBtn}}));
-      if(card){
-        var media=card.querySelector('[data-media]');
-        var titleLink=card.querySelector('.x-card__title-link');
-        var blurFn=function(){
-          addBtn.blur();
-          if(media&&typeof media.blur==='function'){media.blur();}
-          if(titleLink&&typeof titleLink.focus==='function'){titleLink.focus();}
-        };
-        if(window.requestAnimationFrame){
-          window.requestAnimationFrame(function(){window.requestAnimationFrame(blurFn);});
-        }else{
-          setTimeout(blurFn,0);
+      if(typeof e.stopPropagation==='function'){e.stopPropagation();}
+      if(typeof e.stopImmediatePropagation==='function'){e.stopImmediatePropagation();}
+    }
+    var card=addBtn.closest('[data-product-card]');
+    var product=null;
+    if(card){
+      product=productDataMap.get(card);
+      if(!product){
+        product=parseJSONScript(card.querySelector('script[data-product-json]'));
+        if(product){
+          productDataMap.set(card,product);
         }
       }
     }
+    var variant=card?getSelectedVariant(card):null;
+    window.dispatchEvent(new CustomEvent('quick-view:open',{detail:{product:product,variant:variant,trigger:addBtn}}));
+    if(card){
+      var media=card.querySelector('[data-media]');
+      var titleLink=card.querySelector('.x-card__title-link');
+      var blurFn=function(){
+        addBtn.blur();
+        if(media&&typeof media.blur==='function'){media.blur();}
+        if(titleLink&&typeof titleLink.focus==='function'){titleLink.focus();}
+      };
+      if(window.requestAnimationFrame){
+        window.requestAnimationFrame(function(){window.requestAnimationFrame(blurFn);});
+      }else{
+        setTimeout(blurFn,0);
+      }
+    }
+  }
 
+  root.addEventListener('click',function(e){
+    var addBtn=e.target.closest('[data-product-card] [ref="addToCartButton"]');
+    if(addBtn){
+      handleAddButtonClick(addBtn,e);
+    }
+  },true);
+
+  root.addEventListener('click',function(e){
+    if(e.defaultPrevented)return;
     var sw=e.target.closest('.x-swatch');
     if(!sw||sw.disabled)return;
     var card=sw.closest('[data-product-card]');
