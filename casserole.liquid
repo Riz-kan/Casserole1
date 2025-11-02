@@ -306,6 +306,11 @@
   .quick-view-drawer__title{font-size:1.5rem;margin:0;font-weight:600}
   .quick-view-drawer__close{background:none;border:none;font-size:1.75rem;line-height:1;padding:4px;cursor:pointer}
   .quick-view-drawer__body{display:flex;flex-direction:column;gap:16px}
+  .quick-view-drawer__footer{margin-top:auto;display:flex}
+  .quick-view-drawer__add{width:100%;padding:12px 16px;background:#111;color:#fff;border:none;border-radius:8px;font-size:1rem;font-weight:600;cursor:pointer;transition:background .2s ease,opacity .2s ease}
+  .quick-view-drawer__add:hover{background:#000}
+  .quick-view-drawer__add:focus-visible{outline:2px solid #000;outline-offset:2px}
+  .quick-view-drawer__add[disabled]{opacity:.5;cursor:not-allowed}
   .quick-view-drawer__media img{width:100%;height:auto;display:block;border-radius:12px}
   .quick-view-drawer__price{margin:0;font-size:1.25rem;font-weight:600}
   .quick-view-drawer__variants label{display:flex;flex-direction:column;gap:6px;font-size:.95rem}
@@ -544,7 +549,12 @@
       }
     }
     var variant=card?getSelectedVariant(card):null;
-    window.dispatchEvent(new CustomEvent('quick-view:open',{detail:{product:product,variant:variant,trigger:addBtn}}));
+    var detail={product:product,variant:variant,trigger:addBtn};
+    if(window.PetcoQuickViewDrawer&&typeof window.PetcoQuickViewDrawer.open==='function'){
+      detail.__handledByCaller=true;
+      window.PetcoQuickViewDrawer.open(detail);
+    }
+    window.dispatchEvent(new CustomEvent('quick-view:open',{detail:detail}));
     if(card){
       var media=card.querySelector('[data-media]');
       var titleLink=card.querySelector('.x-card__title-link');
@@ -718,49 +728,136 @@
   },true);
 })();
 
-(function(){
-  if(window.__petcoQuickViewInitialized)return;
-  window.__petcoQuickViewInitialized=true;
+(function(window,document){
+  if(window.PetcoQuickViewDrawer)return;
 
-  var overlay=document.createElement('div');
-  overlay.className='quick-view-overlay';
-  overlay.setAttribute('hidden','');
-  overlay.innerHTML=`
-    <div class="quick-view-drawer" role="dialog" aria-modal="true" aria-labelledby="quick-view-title">
-      <div class="quick-view-drawer__header">
-        <h3 id="quick-view-title" class="quick-view-drawer__title" data-quick-view-title></h3>
-        <button type="button" class="quick-view-drawer__close" aria-label="Close quick view" data-quick-view-close>&times;</button>
-      </div>
-      <div class="quick-view-drawer__body">
-        <div class="quick-view-drawer__media">
-          <img data-quick-view-image alt="" />
-        </div>
-        <p class="quick-view-drawer__price" data-quick-view-price></p>
-        <div class="quick-view-drawer__variants" data-quick-view-variants-wrapper>
-          <label>
-            <span class="quick-view-drawer__label" data-quick-view-variants-label>Variant</span>
-            <select data-quick-view-variants></select>
-          </label>
-        </div>
-        <p class="quick-view-drawer__status" data-quick-view-status aria-live="polite"></p>
-      </div>
-    </div>
-  `;
-  document.body.appendChild(overlay);
-
-  var drawerEl=overlay.querySelector('.quick-view-drawer');
-  var closeBtn=overlay.querySelector('[data-quick-view-close]');
-  var titleEl=overlay.querySelector('[data-quick-view-title]');
-  var priceEl=overlay.querySelector('[data-quick-view-price]');
-  var imageEl=overlay.querySelector('[data-quick-view-image]');
-  var variantWrapper=overlay.querySelector('[data-quick-view-variants-wrapper]');
-  var variantLabel=overlay.querySelector('[data-quick-view-variants-label]');
-  var variantSelect=overlay.querySelector('[data-quick-view-variants]');
-  var statusEl=overlay.querySelector('[data-quick-view-status]');
+  var overlay=null;
+  var drawerEl=null;
+  var closeBtn=null;
+  var titleEl=null;
+  var priceEl=null;
+  var imageEl=null;
+  var variantWrapper=null;
+  var variantLabel=null;
+  var variantSelect=null;
+  var statusEl=null;
+  var addButton=null;
 
   var currentProduct=null;
   var currentVariant=null;
   var lastActive=null;
+  var addButtonState='idle';
+  var addButtonDefaultText='Add to cart';
+
+  function ensureOverlay(){
+    if(overlay)return;
+
+    overlay=document.createElement('div');
+    overlay.className='quick-view-overlay';
+    overlay.setAttribute('hidden','');
+    overlay.innerHTML=`
+      <div class="quick-view-drawer" role="dialog" aria-modal="true" aria-labelledby="quick-view-title">
+        <div class="quick-view-drawer__header">
+          <h3 id="quick-view-title" class="quick-view-drawer__title" data-quick-view-title></h3>
+          <button type="button" class="quick-view-drawer__close" aria-label="Close quick view" data-quick-view-close>&times;</button>
+        </div>
+        <div class="quick-view-drawer__body">
+          <div class="quick-view-drawer__media">
+            <img data-quick-view-image alt="" />
+          </div>
+          <p class="quick-view-drawer__price" data-quick-view-price></p>
+          <div class="quick-view-drawer__variants" data-quick-view-variants-wrapper>
+            <label>
+              <span class="quick-view-drawer__label" data-quick-view-variants-label>Variant</span>
+              <select data-quick-view-variants></select>
+            </label>
+          </div>
+          <p class="quick-view-drawer__status" data-quick-view-status aria-live="polite"></p>
+        </div>
+        <div class="quick-view-drawer__footer">
+          <button type="button" class="quick-view-drawer__add" data-quick-view-add>Add to cart</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    drawerEl=overlay.querySelector('.quick-view-drawer');
+    closeBtn=overlay.querySelector('[data-quick-view-close]');
+    titleEl=overlay.querySelector('[data-quick-view-title]');
+    priceEl=overlay.querySelector('[data-quick-view-price]');
+    imageEl=overlay.querySelector('[data-quick-view-image]');
+    variantWrapper=overlay.querySelector('[data-quick-view-variants-wrapper]');
+    variantLabel=overlay.querySelector('[data-quick-view-variants-label]');
+    variantSelect=overlay.querySelector('[data-quick-view-variants]');
+    statusEl=overlay.querySelector('[data-quick-view-status]');
+    addButton=overlay.querySelector('[data-quick-view-add]');
+
+    if(addButton){
+      addButtonDefaultText=(addButton.textContent||'').trim()||addButtonDefaultText;
+      addButton.addEventListener('click',onAddButtonClick);
+    }
+
+    if(closeBtn){
+      closeBtn.addEventListener('click',function(){
+        closeDrawer();
+      });
+    }
+
+    overlay.addEventListener('click',function(event){
+      if(event.target===overlay){
+        closeDrawer();
+      }
+    });
+
+    overlay.addEventListener('keydown',handleOverlayKeydown);
+
+    if(variantSelect){
+      variantSelect.addEventListener('change',function(){
+        if(!currentProduct)return;
+        var nextVariant=getVariantById(currentProduct,variantSelect.value);
+        if(!nextVariant){
+          currentVariant=null;
+          updateImage(currentProduct,null);
+          updatePrice(null,currentProduct);
+          showAvailability(null,currentProduct);
+          resetAddButtonState();
+          return;
+        }
+        currentVariant=nextVariant;
+        updateImage(currentProduct,currentVariant);
+        updatePrice(currentVariant,currentProduct);
+        renderVariants(currentProduct,currentVariant.id);
+        showAvailability(currentVariant,currentProduct);
+        resetAddButtonState();
+      });
+    }
+  }
+
+  function handleOverlayKeydown(event){
+    if(!overlay)return;
+    if(event.key==='Escape'){
+      event.preventDefault();
+      closeDrawer();
+      return;
+    }
+    if(event.key!=='Tab')return;
+    var focusable=overlay.querySelectorAll('button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])');
+    focusable=Array.from(focusable).filter(function(el){return !el.closest('[hidden]');});
+    if(!focusable.length)return;
+    var first=focusable[0];
+    var last=focusable[focusable.length-1];
+    if(event.shiftKey){
+      if(document.activeElement===first||!overlay.contains(document.activeElement)){
+        event.preventDefault();
+        last.focus();
+      }
+    }else{
+      if(document.activeElement===last){
+        event.preventDefault();
+        first.focus();
+      }
+    }
+  }
 
   function isHatProduct(product){
     if(!product)return false;
@@ -775,6 +872,7 @@
   }
 
   function showOverlay(){
+    ensureOverlay();
     if(!overlay)return;
     overlay.removeAttribute('hidden');
     var activate=function(){overlay.classList.add('is-active');};
@@ -951,7 +1049,7 @@
     priceEl.textContent=priceSource!=null?formatMoney(priceSource):'';
   }
 
-  function updateStatus(variant,product){
+  function showAvailability(variant,product){
     if(!statusEl)return;
     if(variant){
       statusEl.textContent=variant.available?'':'This variant is currently unavailable.';
@@ -964,19 +1062,138 @@
     }
   }
 
+  function showFeedback(message){
+    if(statusEl){
+      statusEl.textContent=message||'';
+    }
+  }
+
+  function updateAddButtonState(){
+    if(!addButton)return;
+    var disabled=false;
+    var label=addButtonDefaultText;
+    if(addButtonState==='loading'){
+      label='Adding…';
+      disabled=true;
+    }else if(addButtonState==='success'){
+      label='Added!';
+    }else if(addButtonState==='error'){
+      label='Try again';
+    }
+    if(!currentVariant||currentVariant.available===false){
+      label=currentVariant&&currentVariant.available===false?'Sold out':'Unavailable';
+      disabled=true;
+    }
+    addButton.disabled=disabled;
+    if(disabled){
+      addButton.setAttribute('aria-disabled','true');
+    }else{
+      addButton.removeAttribute('aria-disabled');
+    }
+    addButton.textContent=label;
+  }
+
+  function resetAddButtonState(){
+    addButtonState='idle';
+    updateAddButtonState();
+    showAvailability(currentVariant,currentProduct);
+  }
+
+  function handleAddSuccess(){
+    addButtonState='success';
+    updateAddButtonState();
+    showFeedback('Added to cart.');
+    window.dispatchEvent(new CustomEvent('cart:refresh',{detail:{source:'quick-view',product:currentProduct,variant:currentVariant}}));
+    setTimeout(function(){
+      if(addButtonState==='success'){
+        addButtonState='idle';
+        updateAddButtonState();
+        showAvailability(currentVariant,currentProduct);
+      }
+    },2000);
+  }
+
+  function handleAddError(error){
+    addButtonState='error';
+    updateAddButtonState();
+    var message='Sorry, we could not add this item to the cart.';
+    if(error){
+      if(typeof error==='string'){
+        message=error;
+      }else if(typeof error.description==='string'){
+        message=error.description;
+      }else if(typeof error.message==='string'){
+        message=error.message;
+      }else if(typeof error.errors==='string'){
+        message=error.errors;
+      }else if(Array.isArray(error.errors)){
+        message=error.errors.join(', ');
+      }
+    }
+    showFeedback(message);
+  }
+
+  function onAddButtonClick(){
+    if(!currentVariant||currentVariant.available===false){
+      showFeedback('Please choose an available variant.');
+      updateAddButtonState();
+      return;
+    }
+    addButtonState='loading';
+    updateAddButtonState();
+    showFeedback('');
+    var payload={id:currentVariant.id,quantity:1};
+    fetch('/cart/add.js',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Accept':'application/json'},
+      body:JSON.stringify(payload),
+      credentials:'same-origin'
+    }).then(function(response){
+      if(response.ok){
+        return response.json();
+      }
+      return response.json().catch(function(){return {};}).then(function(error){throw error;});
+    }).then(function(){
+      handleAddSuccess();
+    }).catch(function(error){
+      handleAddError(error);
+    });
+  }
+
   function openDrawer(product,variant,trigger){
-    if(!product)return;
+    ensureOverlay();
+    if(!product||isHatProduct(product))return;
+
     currentProduct=product;
     currentVariant=variant||null;
+    if(currentVariant&&currentProduct&&Array.isArray(currentProduct.variants)){
+      var matched=getVariantById(currentProduct,currentVariant.id);
+      if(matched){
+        currentVariant=matched;
+      }
+    }
+    if((!currentVariant||currentVariant.available===false)&&currentProduct&&Array.isArray(currentProduct.variants)&&currentProduct.variants.length){
+      var firstAvailable=currentProduct.variants.find(function(v){return v.available;});
+      if(firstAvailable){
+        currentVariant=firstAvailable;
+      }else if(!currentVariant){
+        currentVariant=currentProduct.variants[0];
+      }
+    }
+
     lastActive=trigger&&typeof trigger.focus==='function'?trigger:document.activeElement;
-    if(titleEl)titleEl.textContent=product.title||'';
-    updateImage(product,currentVariant);
-    updatePrice(currentVariant,product);
-    updateStatus(currentVariant,product);
-    renderVariants(product,currentVariant&&currentVariant.id);
+
+    if(titleEl)titleEl.textContent=currentProduct.title||'';
+    updateImage(currentProduct,currentVariant);
+    updatePrice(currentVariant,currentProduct);
+    renderVariants(currentProduct,currentVariant&&currentVariant.id);
+    showAvailability(currentVariant,currentProduct);
+    resetAddButtonState();
+
     if(drawerEl){
       drawerEl.scrollTop=0;
     }
+
     showOverlay();
     document.body.classList.add('quick-view-open');
     requestAnimationFrame(function(){
@@ -985,7 +1202,7 @@
   }
 
   function closeDrawer(){
-    if(overlay.hasAttribute('hidden'))return;
+    if(!overlay||overlay.hasAttribute('hidden'))return;
     hideOverlay();
     document.body.classList.remove('quick-view-open');
     if(lastActive&&typeof lastActive.focus==='function'){
@@ -993,90 +1210,30 @@
     }
   }
 
-  if(closeBtn){
-    closeBtn.addEventListener('click',function(){
-      closeDrawer();
-    });
-  }
-
-  overlay.addEventListener('click',function(e){
-    if(e.target===overlay){
+  window.PetcoQuickViewDrawer={
+    init:function(){
+      ensureOverlay();
+    },
+    open:function(detail){
+      detail=detail||{};
+      openDrawer(detail.product||null,detail.variant||null,detail.trigger||null);
+    },
+    close:function(){
       closeDrawer();
     }
-  });
-
-  overlay.addEventListener('keydown',function(e){
-    if(e.key==='Escape'){
-      e.preventDefault();
-      closeDrawer();
-      return;
-    }
-    if(e.key!=='Tab')return;
-    var focusable=overlay.querySelectorAll('button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])');
-    focusable=Array.from(focusable).filter(function(el){return !el.closest('[hidden]');});
-    if(!focusable.length)return;
-    var first=focusable[0];
-    var last=focusable[focusable.length-1];
-    if(e.shiftKey){
-      if(document.activeElement===first||!overlay.contains(document.activeElement)){
-        e.preventDefault();
-        last.focus();
-      }
-    }else{
-      if(document.activeElement===last){
-        e.preventDefault();
-        first.focus();
-      }
-    }
-  });
-
-  if(variantSelect){
-    variantSelect.addEventListener('change',function(){
-      if(!currentProduct)return;
-      var nextVariant=getVariantById(currentProduct,variantSelect.value);
-      if(!nextVariant){
-        currentVariant=null;
-        updateImage(currentProduct,null);
-        updatePrice(null,currentProduct);
-        updateStatus(null,currentProduct);
-        return;
-      }
-      currentVariant=nextVariant;
-      updateImage(currentProduct,currentVariant);
-      updatePrice(currentVariant,currentProduct);
-      updateStatus(currentVariant,currentProduct);
-      renderVariants(currentProduct,currentVariant.id);
-    });
-  }
+  };
 
   window.addEventListener('quick-view:open',function(event){
     var detail=event.detail||{};
-    var product=detail.product;
-    if(!product)return;
-    if(isHatProduct(product)){
+    if(detail.__handledByCaller){
       return;
     }
-    var variant=detail.variant;
-    if(variant&&product&&Array.isArray(product.variants)){
-      var matched=getVariantById(product,variant.id);
-      if(matched){
-        variant=matched;
-      }
-    }
-    if((!variant||variant.available===false)&&product&&Array.isArray(product.variants)&&product.variants.length){
-      var firstAvailable=product.variants.find(function(v){return v.available;});
-      if(firstAvailable){
-        variant=firstAvailable;
-      }else if(!variant){
-        variant=product.variants[0];
-      }
-    }
-    openDrawer(product,variant||null,detail.trigger);
+    window.PetcoQuickViewDrawer.open(detail);
   });
 
   window.addEventListener('quick-view:close',function(){
-    closeDrawer();
+    window.PetcoQuickViewDrawer.close();
   });
-})();
+})(window,document);
 </script>
 
