@@ -28,6 +28,16 @@
               {% endif %}
             {% endif %}
 
+            {% assign product_handle_downcase = product.handle | downcase %}
+            {% assign product_title_downcase = product.title | strip | downcase %}
+            {% assign handle_tokens = product_handle_downcase | split: '-' %}
+            {% assign normalized_title = product_title_downcase | replace: '-', ' ' | replace: '_', ' ' | replace: ',', ' ' | replace: '.', ' ' | replace: '/', ' ' | replace: '&', ' ' | replace: "'", ' ' %}
+            {% assign title_tokens = normalized_title | split: ' ' %}
+            {% assign disable_add_to_cart = false %}
+            {% if handle_tokens contains 'hat' or title_tokens contains 'hat' %}
+              {% assign disable_add_to_cart = true %}
+            {% endif %}
+
             <article class="x-card xpet__card" role="listitem" data-product-card>
               <div class="x-card__media" data-media tabindex="-1">
                 <img
@@ -68,10 +78,12 @@
                       >
                         <button
                           type="button"
-                          class="button x-card__add-button"
+                          class="button x-card__add-button{% if disable_add_to_cart %} x-card__add-button--disabled{% endif %}"
                           ref="addToCartButton"
                           name="add"
                           data-variant-unavailable="{% if default_var.available %}false{% else %}true{% endif %}"
+                          data-quick-view-disabled="{% if disable_add_to_cart %}true{% else %}false{% endif %}"
+                          {% if disable_add_to_cart %}disabled aria-disabled="true"{% endif %}
                         >
                           <span class="x-card__add-icon" aria-hidden="true">+</span>
                           <span class="visually-hidden add-to-cart-text--default">{{ 'products.product.add_to_cart' | t }}</span>
@@ -267,7 +279,8 @@
   .x-card__add-button:focus-visible{outline:2px solid #000;outline-offset:2px}
   .x-card__add-button:hover,
   .x-card__add-button:focus-visible{background:#f7f7f7;border-color:rgba(0,0,0,.12);box-shadow:0 4px 12px rgba(0,0,0,.16)}
-  .x-card__add-button:disabled{opacity:.4;cursor:not-allowed;box-shadow:none}
+  .x-card__add-button:disabled{opacity:.4;cursor:not-allowed;box-shadow:none;pointer-events:none}
+  .x-card__add-button--disabled{opacity:.4;cursor:not-allowed}
   .x-card__add-button[data-variant-unavailable="true"]{opacity:.6}
   .x-card__add-icon{font-size:28px;line-height:1;color:#000}
   .x-card__actions{opacity:0;transform:translateY(8px);transition:opacity .18s ease, transform .18s ease}
@@ -284,9 +297,11 @@
   .x-swatch[disabled]{opacity:.5;cursor:not-allowed}
   .x-swatch__box{width:100%;height:100%;border-radius:0;background:var(--swatch-bg, #e5e5e5);box-shadow:inset 0 0 0 1px rgba(0,0,0,.06)}
 
-  .quick-view-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center;z-index:9999;padding:16px;box-sizing:border-box}
+  .quick-view-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:stretch;justify-content:flex-end;z-index:9999;padding:0;box-sizing:border-box;opacity:0;pointer-events:none;transition:opacity .24s ease}
+  .quick-view-overlay.is-active{opacity:1;pointer-events:auto}
   .quick-view-overlay[hidden]{display:none}
-  .quick-view-drawer{background:#fff;width:min(480px,100%);max-height:90vh;overflow:auto;border-radius:16px 16px 0 0;padding:24px;box-shadow:0 -12px 32px rgba(0,0,0,.28);display:flex;flex-direction:column;gap:16px}
+  .quick-view-drawer{background:#fff;width:min(420px,100%);max-width:420px;height:100%;overflow:auto;border-radius:0;padding:24px;box-shadow:-24px 0 48px rgba(0,0,0,.28);display:flex;flex-direction:column;gap:16px;transform:translateX(100%);transition:transform .28s ease}
+  .quick-view-overlay.is-active .quick-view-drawer{transform:translateX(0)}
   .quick-view-drawer__header{display:flex;align-items:center;justify-content:space-between;gap:12px}
   .quick-view-drawer__title{font-size:1.5rem;margin:0;font-weight:600}
   .quick-view-drawer__close{background:none;border:none;font-size:1.75rem;line-height:1;padding:4px;cursor:pointer}
@@ -297,7 +312,12 @@
   .quick-view-drawer__variants select{padding:8px;border:1px solid rgba(0,0,0,.15);border-radius:6px;font-size:1rem}
   .quick-view-drawer__status{margin:0;font-size:.9rem;color:#a40000;min-height:1em}
   body.quick-view-open{overflow:hidden}
-  @media (min-width:900px){.quick-view-drawer{border-radius:16px}}
+  @media (max-width:599px){.quick-view-drawer{max-width:100%;width:100%}}
+  @media (min-width:900px){.quick-view-drawer{max-width:480px}}
+  @media (prefers-reduced-motion: reduce){
+    .quick-view-overlay{transition:none}
+    .quick-view-drawer{transition:none}
+  }
 
   /* Reduced motion */
   @media (prefers-reduced-motion: reduce){.xpet__track{scroll-behavior:auto}}
@@ -499,6 +519,10 @@
   root.addEventListener('click',function(e){
     var addBtn=e.target.closest('[data-product-card] [ref="addToCartButton"]');
     if(addBtn){
+      if(addBtn.dataset.quickViewDisabled==='true' || addBtn.hasAttribute('disabled')){
+        e.preventDefault();
+        return;
+      }
       e.preventDefault();
       var card=addBtn.closest('[data-product-card]');
       var product=null;
@@ -707,6 +731,7 @@
   `;
   document.body.appendChild(overlay);
 
+  var drawerEl=overlay.querySelector('.quick-view-drawer');
   var closeBtn=overlay.querySelector('[data-quick-view-close]');
   var titleEl=overlay.querySelector('[data-quick-view-title]');
   var priceEl=overlay.querySelector('[data-quick-view-price]');
@@ -719,6 +744,87 @@
   var currentProduct=null;
   var currentVariant=null;
   var lastActive=null;
+
+  function isHatProduct(product){
+    if(!product)return false;
+    var handle=String(product.handle||'').toLowerCase();
+    var title=String(product.title||'').toLowerCase().trim();
+    if(handle==='hat' || title==='hat')return true;
+    var handleTokens=handle.split('-').filter(Boolean);
+    if(handleTokens.indexOf('hat')>-1)return true;
+    var normalizedTitle=title.replace(/[-_,./&']/g,' ');
+    var titleTokens=normalizedTitle.split(/\s+/).filter(Boolean);
+    return titleTokens.indexOf('hat')>-1;
+  }
+
+  function showOverlay(){
+    if(!overlay)return;
+    overlay.removeAttribute('hidden');
+    var activate=function(){overlay.classList.add('is-active');};
+    if(window.requestAnimationFrame){
+      requestAnimationFrame(activate);
+    }else{
+      setTimeout(activate,0);
+    }
+  }
+
+  function hideOverlay(){
+    if(!overlay)return;
+    if(!overlay.classList.contains('is-active')){
+      overlay.setAttribute('hidden','');
+      return;
+    }
+    var handled=false;
+    var fallbackDelay=400;
+    if(window.getComputedStyle){
+      try{
+        var styles=getComputedStyle(overlay);
+        if(styles){
+          var durationParts=(styles.transitionDuration||'').split(',');
+          var delayParts=(styles.transitionDelay||'').split(',');
+          var maxDuration=0;
+          var count=Math.max(durationParts.length,delayParts.length);
+          for(var i=0;i<count;i++){
+            var durationValue=parseFloat(durationParts[i]||durationParts[0]||'0')||0;
+            var delayValue=parseFloat(delayParts[i]||delayParts[0]||'0')||0;
+            var total=(durationValue+delayValue)*1000;
+            if(total>maxDuration){
+              maxDuration=total;
+            }
+          }
+          if(maxDuration>0){
+            fallbackDelay=maxDuration+50;
+          }else{
+            fallbackDelay=0;
+          }
+        }
+      }catch(err){}
+    }
+    var handleTransitionEnd=function(event){
+      if(event.target!==overlay)return;
+      handled=true;
+      overlay.removeEventListener('transitionend',handleTransitionEnd);
+      overlay.setAttribute('hidden','');
+    };
+    overlay.addEventListener('transitionend',handleTransitionEnd);
+    var deactivate=function(){overlay.classList.remove('is-active');};
+    if(window.requestAnimationFrame){
+      requestAnimationFrame(deactivate);
+    }else{
+      deactivate();
+    }
+    var finalize=function(){
+      if(!handled){
+        overlay.removeEventListener('transitionend',handleTransitionEnd);
+        overlay.setAttribute('hidden','');
+      }
+    };
+    if(fallbackDelay<=0){
+      finalize();
+    }else{
+      setTimeout(finalize,fallbackDelay);
+    }
+  }
 
   function normaliseImage(image,fallbackAlt){
     if(!image)return null;
@@ -851,7 +957,10 @@
     updatePrice(currentVariant,product);
     updateStatus(currentVariant,product);
     renderVariants(product,currentVariant&&currentVariant.id);
-    overlay.removeAttribute('hidden');
+    if(drawerEl){
+      drawerEl.scrollTop=0;
+    }
+    showOverlay();
     document.body.classList.add('quick-view-open');
     requestAnimationFrame(function(){
       if(closeBtn)closeBtn.focus();
@@ -860,7 +969,7 @@
 
   function closeDrawer(){
     if(overlay.hasAttribute('hidden'))return;
-    overlay.setAttribute('hidden','');
+    hideOverlay();
     document.body.classList.remove('quick-view-open');
     if(lastActive&&typeof lastActive.focus==='function'){
       lastActive.focus();
@@ -927,6 +1036,9 @@
     var detail=event.detail||{};
     var product=detail.product;
     if(!product)return;
+    if(isHatProduct(product)){
+      return;
+    }
     var variant=detail.variant;
     if(variant&&product&&Array.isArray(product.variants)){
       var matched=getVariantById(product,variant.id);
